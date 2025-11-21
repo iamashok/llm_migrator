@@ -1,4 +1,5 @@
-# OpenAI → Mistral Migration Tool
+# LLM Migrator
+# Version 1- OpenAI → Mistral Migration Tool
 
 **Automatically analyze your codebase and generate migration guides to switch from OpenAI to Mistral AI.**
 
