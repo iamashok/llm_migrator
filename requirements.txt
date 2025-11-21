@@ -5,6 +5,7 @@
 #
 # For Web UI:
 flask>=2.3.0
+gunicorn>=20.1.0
 
 # To run the examples, you'll need the respective SDKs:
 #

@@ -306,8 +306,9 @@ def cleanup_temp_dir(temp_dir):
         print(f"Warning: Failed to cleanup {temp_dir}: {e}")
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
     try:
-        app.run(debug=True, port=5000)
+        app.run(host='0.0.0.0', port=port, debug=False)
     finally:
         # Cleanup all temp directories on exit
         for temp_dir in temp_dirs:
