@@ -302,10 +302,4 @@ MIT License - feel free to use, modify, and share.
 
 ---
 
-## Author
-
-Built by [Ashok Pitchamani](https://iamashok.com)
-
----
-
 **Try it now:** `python migrate_to_mistral.py scan ./your-code`
