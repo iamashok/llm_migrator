@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAI → Mistral Migration Tool</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <span class="logo-icon">🔄</span>
+                <h1>OpenAI → Mistral Migration Tool</h1>
+            </div>
+            <p class="tagline">Analyze your codebase and discover migration savings in seconds</p>
+        </header>
+
+        <main>
+            <section class="scan-section">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="local">
+                        <span class="tab-icon">📁</span> Local Directory
+                    </button>
+                    <button class="tab-btn" data-tab="github">
+                        <span class="tab-icon">🐙</span> GitHub Repository
+                    </button>
+                </div>
+
+                <div id="localTab" class="tab-content active">
+                    <div class="scan-box">
+                        <h2>Scan Local Codebase</h2>
+                        <p>Enter a directory path to analyze OpenAI API usage</p>
+                        <div class="input-group">
+                            <input type="text" id="scanPath" placeholder="./your-project" value=".">
+                            <button id="scanBtn" class="btn-primary">
+                                <span class="btn-icon">🔍</span> Scan Directory
+                            </button>
+                        </div>
+                        <button id="demoBtn" class="btn-secondary">
+                            <span class="btn-icon">⚡</span> Run Demo (Current Directory)
+                        </button>
+                    </div>
+                </div>
+
+                <div id="githubTab" class="tab-content">
+                    <div class="scan-box">
+                        <h2>Scan GitHub Repository</h2>
+                        <p>Enter a public GitHub repository URL to analyze</p>
+                        <div class="input-group">
+                            <input type="text" id="githubUrl" placeholder="https://github.com/username/repo">
+                            <button id="githubScanBtn" class="btn-primary">
+                                <span class="btn-icon">🐙</span> Scan GitHub Repo
+                            </button>
+                        </div>
+                        <div class="github-examples">
+                            <p><strong>Try these examples:</strong></p>
+                            <button class="example-btn" data-url="https://github.com/openai/openai-cookbook">openai/openai-cookbook</button>
+                            <button class="example-btn" data-url="https://github.com/langchain-ai/langchain">langchain-ai/langchain</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Scanning codebase...</p>
+            </div>
+
+            <div id="results" class="results hidden">
+                <!-- Summary Section -->
+                <section class="summary-section">
+                    <h2>📊 Migration Summary</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalCalls">0</div>
+                            <div class="stat-label">OpenAI API Calls</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="filesAffected">0</div>
+                            <div class="stat-label">Files Affected</div>
+                        </div>
+                        <div class="stat-card highlight">
+                            <div class="stat-value" id="savings">$0</div>
+                            <div class="stat-label">Monthly Savings</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="effort">0 min</div>
+                            <div class="stat-label">Estimated Effort</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Cost Comparison -->
+                <section class="cost-section">
+                    <h2>💰 Cost Comparison</h2>
+                    <div class="cost-bars">
+                        <div class="cost-bar-container">
+                            <div class="cost-label">
+                                <span>OpenAI (gpt-4)</span>
+                                <span class="cost-amount" id="openaiCost">$300/mo</span>
+                            </div>
+                            <div class="cost-bar openai-bar">
+                                <div class="cost-bar-fill" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        <div class="cost-bar-container">
+                            <div class="cost-label">
+                                <span>Mistral (mistral-large)</span>
+                                <span class="cost-amount" id="mistralCost">$100/mo</span>
+                            </div>
+                            <div class="cost-bar mistral-bar">
+                                <div class="cost-bar-fill" id="mistralBarFill" style="width: 33%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="savings-highlight">
+                        <span class="savings-icon">📉</span>
+                        <span class="savings-text">Save <strong id="savingsPercent">67%</strong> on your AI API costs</span>
+                    </div>
+                </section>
+
+                <!-- Pattern Breakdown -->
+                <section class="patterns-section">
+                    <h2>🔍 Detected Patterns</h2>
+                    <div id="patternsList" class="patterns-list"></div>
+                </section>
+
+                <!-- Migration Examples -->
+                <section class="examples-section">
+                    <h2>📝 Migration Examples</h2>
+                    <div id="examplesList" class="examples-list"></div>
+                </section>
+
+                <!-- Files to Update -->
+                <section class="files-section">
+                    <h2>📁 Files to Update</h2>
+                    <div id="filesList" class="files-list"></div>
+                </section>
+
+                <!-- Next Steps -->
+                <section class="next-steps-section">
+                    <h2>✅ Next Steps</h2>
+                    <ol class="next-steps">
+                        <li>Install Mistral SDK: <code>pip install mistralai</code></li>
+                        <li>Get API key: <a href="https://console.mistral.ai/" target="_blank">console.mistral.ai</a></li>
+                        <li>Update imports in detected files</li>
+                        <li>Replace model names (gpt-4 → mistral-large-latest)</li>
+                        <li>Test thoroughly in development</li>
+                        <li>Monitor cost savings in production</li>
+                    </ol>
+                </section>
+            </div>
+
+            <div id="error" class="error hidden">
+                <span class="error-icon">⚠️</span>
+                <span id="errorMessage"></span>
+            </div>
+        </main>
+
+        <footer>
+            <p>Migration Tool for OpenAI to Mistral AI</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# OpenAI → Mistral Migration Tool
+#
+# This tool uses only Python standard library to ensure maximum portability.
+# No external dependencies required for CLI usage!
+#
+# For Web UI:
+flask>=2.3.0
+
+# To run the examples, you'll need the respective SDKs:
+#
+# For OpenAI examples:
+# openai>=1.0.0
+#
+# For Mistral examples:
+# mistralai>=0.1.0
+#
+# The CLI migration tool itself requires NO dependencies.
+# This is intentional - good DX means minimal setup friction.
