@@ -28,6 +28,7 @@ class APICall:
     pattern_type: str  # 'chat', 'completion', 'embedding', 'streaming', 'function_calling'
     code_snippet: str
     confidence: str  # 'high', 'medium', 'low'
+    model: str = 'gpt-4'  # Default to gpt-4 if not detected
 
 
 @dataclass
@@ -105,18 +106,20 @@ class MigrationAnalyzer:
     def _analyze_file(self, file_path: Path, content: str):
         """Analyze a single file for OpenAI patterns"""
         lines = content.split('\n')
-        
+
         # Check if file uses OpenAI at all
         has_openai = any(
             re.search(pattern, content)
             for pattern in self.OPENAI_PATTERNS['import']
         )
-        
+
         if not has_openai:
             return
-        
+
         # Find specific API calls
         for i, line in enumerate(lines, 1):
+            detected_model = self._extract_model_name(line, lines, i)
+
             # Chat completions
             if any(re.search(p, line) for p in self.OPENAI_PATTERNS['chat']):
                 self.api_calls.append(APICall(
@@ -124,9 +127,10 @@ class MigrationAnalyzer:
                     line_number=i,
                     pattern_type='chat',
                     code_snippet=line.strip(),
-                    confidence='high'
+                    confidence='high',
+                    model=detected_model
                 ))
-            
+
             # Legacy completions
             elif any(re.search(p, line) for p in self.OPENAI_PATTERNS['completion']):
                 self.api_calls.append(APICall(
@@ -134,18 +138,67 @@ class MigrationAnalyzer:
                     line_number=i,
                     pattern_type='completion',
                     code_snippet=line.strip(),
-                    confidence='high'
+                    confidence='high',
+                    model=detected_model
                 ))
-            
+
             # Embeddings
             elif any(re.search(p, line) for p in self.OPENAI_PATTERNS['embedding']):
+                # Check if it's an embedding model
+                if 'embedding' in detected_model or detected_model == 'gpt-4':
+                    detected_model = 'text-embedding-ada-002'
                 self.api_calls.append(APICall(
                     file_path=str(file_path),
                     line_number=i,
                     pattern_type='embedding',
                     code_snippet=line.strip(),
-                    confidence='high'
+                    confidence='high',
+                    model=detected_model
                 ))
+
+    def _extract_model_name(self, current_line: str, all_lines: List[str], current_index: int) -> str:
+        """
+        Extract model name from API call or surrounding context.
+        Uses balanced parenthesis tracking to handle complex nested structures.
+        """
+        # Enhanced patterns to match various model specifications
+        model_patterns = [
+            r'model\s*=\s*["\']([^"\']+)["\']',  # model="gpt-4"
+            r'model:\s*["\']([^"\']+)["\']',     # model: "gpt-4"
+            r'model\s*=\s*(\w+)',                 # model=MODEL_VAR
+            r'"model"\s*:\s*["\']([^"\']+)["\']', # "model": "gpt-4"
+        ]
+
+        # Try to find model in current line first
+        for pattern in model_patterns:
+            match = re.search(pattern, current_line)
+            if match:
+                return match.group(1)
+
+        # Track parenthesis depth to find function call boundaries
+        paren_depth = current_line.count('(') - current_line.count(')')
+
+        # Look ahead with balanced parenthesis tracking (up to 50 lines)
+        max_lookahead = min(50, len(all_lines) - current_index)
+
+        for offset in range(1, max_lookahead):
+            next_line = all_lines[current_index + offset - 1]
+
+            # Try to find model in this line
+            for pattern in model_patterns:
+                match = re.search(pattern, next_line)
+                if match:
+                    return match.group(1)
+
+            # Update parenthesis depth
+            paren_depth += next_line.count('(') - next_line.count(')')
+
+            # Stop when we've closed all parentheses (end of function call)
+            if paren_depth <= 0:
+                break
+
+        # Default to gpt-4 if not found
+        return 'gpt-4'
 
 
 class MigrationGuideGenerator:

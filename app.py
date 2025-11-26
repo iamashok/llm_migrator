@@ -10,11 +10,15 @@ import subprocess
 import re
 from pathlib import Path
 from migrate_to_mistral import MigrationAnalyzer
+from pricing_service import PricingService
 
 app = Flask(__name__)
 
 # Store for temporary directories (for cleanup)
 temp_dirs = []
+
+# Initialize pricing service
+pricing_service = PricingService()
 
 @app.route('/')
 def index():
@@ -38,20 +42,19 @@ def scan():
         # Process results
         results = process_api_calls(api_calls)
 
+        # Calculate real cost savings
+        cost_savings = calculate_real_cost_savings(api_calls)
+
         # Format results for UI
         response = {
             'summary': {
                 'total_calls': results['total_calls'],
                 'files_affected': results['files_affected'],
-                'patterns': results['patterns']
+                'patterns': results['patterns'],
+                'models': results['models']
             },
             'files': results['files'],
-            'cost_savings': {
-                'openai_cost': 300,
-                'mistral_cost': 100,
-                'savings': 200,
-                'percentage': 67
-            },
+            'cost_savings': cost_savings,
             'examples': get_migration_examples(results['patterns']),
             'effort_estimate': calculate_effort(results['total_calls'])
         }
@@ -71,19 +74,18 @@ def demo():
         # Process results
         results = process_api_calls(api_calls)
 
+        # Calculate real cost savings
+        cost_savings = calculate_real_cost_savings(api_calls)
+
         response = {
             'summary': {
                 'total_calls': results['total_calls'],
                 'files_affected': results['files_affected'],
-                'patterns': results['patterns']
+                'patterns': results['patterns'],
+                'models': results['models']
             },
             'files': results['files'],
-            'cost_savings': {
-                'openai_cost': 300,
-                'mistral_cost': 100,
-                'savings': 200,
-                'percentage': 67
-            },
+            'cost_savings': cost_savings,
             'examples': get_migration_examples(results['patterns']),
             'effort_estimate': calculate_effort(results['total_calls'])
         }
@@ -142,20 +144,19 @@ def scan_github():
             rel_path = str(Path(file_path).relative_to(temp_dir))
             cleaned_files[rel_path] = locations
 
+        # Calculate real cost savings
+        cost_savings = calculate_real_cost_savings(api_calls)
+
         response = {
             'summary': {
                 'total_calls': results['total_calls'],
                 'files_affected': results['files_affected'],
                 'patterns': results['patterns'],
+                'models': results['models'],
                 'repo_url': github_url
             },
             'files': cleaned_files,
-            'cost_savings': {
-                'openai_cost': 300,
-                'mistral_cost': 100,
-                'savings': 200,
-                'percentage': 67
-            },
+            'cost_savings': cost_savings,
             'examples': get_migration_examples(results['patterns']),
             'effort_estimate': calculate_effort(results['total_calls'])
         }
@@ -175,6 +176,7 @@ def process_api_calls(api_calls):
     """Process APICall objects into summary format"""
     files = {}
     patterns = {}
+    models = {}
 
     for call in api_calls:
         # Group by file
@@ -182,18 +184,51 @@ def process_api_calls(api_calls):
             files[call.file_path] = []
         files[call.file_path].append({
             'line': call.line_number,
-            'pattern_type': call.pattern_type
+            'pattern_type': call.pattern_type,
+            'model': call.model
         })
 
         # Count patterns
         patterns[call.pattern_type] = patterns.get(call.pattern_type, 0) + 1
 
+        # Count models
+        models[call.model] = models.get(call.model, 0) + 1
+
     return {
         'total_calls': len(api_calls),
         'files_affected': len(files),
         'patterns': patterns,
-        'files': files
+        'files': files,
+        'models': models
     }
+
+def calculate_real_cost_savings(api_calls, estimated_monthly_tokens=(5_000_000, 5_000_000)):
+    """Calculate real cost savings using OpenRouter pricing"""
+    if not api_calls:
+        return {
+            'openai_cost': 0,
+            'mistral_cost': 0,
+            'savings': 0,
+            'percentage': 0
+        }
+
+    # Count model usage
+    model_counts = {}
+    for call in api_calls:
+        model_counts[call.model] = model_counts.get(call.model, 0) + 1
+
+    total_calls = len(api_calls)
+
+    # Calculate usage percentage for each model
+    openai_models = {}
+    for model, count in model_counts.items():
+        openai_models[model] = count / total_calls
+
+    # Use pricing service to estimate costs
+    return pricing_service.estimate_migration_savings(
+        estimated_monthly_tokens=estimated_monthly_tokens,
+        openai_models=openai_models
+    )
 
 def get_migration_examples(patterns):
     """Get migration examples based on detected patterns"""

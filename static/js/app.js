@@ -157,6 +157,9 @@ document.addEventListener('DOMContentLoaded', function() {
         error.classList.add('hidden');
         results.classList.remove('hidden');
 
+        // Store data for patterns display
+        window.lastScanData = data;
+
         // Update summary stats
         document.getElementById('totalCalls').textContent = data.summary.total_calls;
         document.getElementById('filesAffected').textContent = data.summary.files_affected;
@@ -199,6 +202,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="pattern-count">${count} call${count !== 1 ? 's' : ''}</span>
             `;
             patternsList.appendChild(badge);
+        }
+
+        // Display detected models if available
+        if (window.lastScanData && window.lastScanData.summary.models) {
+            const models = window.lastScanData.summary.models;
+            const modelsHeader = document.createElement('h4');
+            modelsHeader.textContent = 'Detected Models:';
+            modelsHeader.style.marginTop = '20px';
+            modelsHeader.style.marginBottom = '10px';
+            patternsList.appendChild(modelsHeader);
+
+            for (const [model, count] of Object.entries(models)) {
+                const badge = document.createElement('div');
+                badge.className = 'pattern-badge';
+                badge.style.background = '#e8f4f8';
+                badge.style.borderColor = '#0ea5e9';
+                badge.innerHTML = `
+                    <span>${escapeHtml(model)}</span>
+                    <span class="pattern-count">${count} call${count !== 1 ? 's' : ''}</span>
+                `;
+                patternsList.appendChild(badge);
+            }
         }
     }
 
@@ -251,9 +276,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
 
-            const locationBadges = locations.map(loc =>
-                `<span class="location-badge">Line ${loc.line}: ${escapeHtml(loc.pattern_type)}</span>`
-            ).join('');
+            const locationBadges = locations.map(loc => {
+                const modelInfo = loc.model ? ` (${escapeHtml(loc.model)})` : '';
+                return `<span class="location-badge">Line ${loc.line}: ${escapeHtml(loc.pattern_type)}${modelInfo}</span>`;
+            }).join('');
 
             fileItem.innerHTML = `
                 <div class="file-name">📄 ${escapeHtml(filename)}</div>
