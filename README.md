@@ -26,11 +26,13 @@ python3 app.py
 ## Features
 
 - 🔍 **Automatic Detection** - Scans Python codebases for OpenAI API patterns
-- 📊 **Cost Analysis** - Calculates potential savings from switching to Mistral
+- 💰 **Real-Time Pricing** - Fetches current model pricing from OpenRouter API
+- 📊 **Accurate Cost Analysis** - Calculates real savings based on detected models and usage
 - 📝 **Migration Examples** - Generates side-by-side code comparisons
 - 🌐 **Web Interface** - Modern UI with GitHub repository scanning
 - 🎯 **Effort Estimates** - Shows migration complexity for each pattern
 - 📁 **File Mapping** - Lists exact files and line numbers to update
+- 🤖 **Model Detection** - Identifies which GPT models you're using (GPT-4, GPT-3.5, etc.)
 
 ---
 
@@ -113,8 +115,29 @@ python3 app.py
 Features:
 - **Local Directory Scanning** - Analyze projects on your machine
 - **GitHub Repository Scanning** - Clone and analyze any public repo
+- **Real-Time Pricing** - Live cost calculations from OpenRouter API
 - **Visual Cost Comparison** - Interactive charts and statistics
+- **Model Detection** - Shows which GPT models are in use
 - **Downloadable Reports** - Export migration guides
+
+### Real-Time Pricing Integration
+
+The tool now fetches live pricing data from [OpenRouter](https://openrouter.ai/models) to calculate accurate cost savings:
+
+```python
+# Automatically detects your model usage
+# Calculates real costs based on:
+# - Detected GPT models (GPT-4, GPT-3.5, etc.)
+# - Current market pricing
+# - Estimated token volumes
+
+Example Output:
+  OpenAI (GPT-4): $450/month
+  Mistral (Large): $40/month
+  Savings: $410/month (91.1%)
+```
+
+See [PRICING_INTEGRATION.md](PRICING_INTEGRATION.md) for full documentation.
 
 ---
 
