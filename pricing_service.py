@@ -20,7 +20,9 @@ class PricingService:
     CACHE_DURATION = timedelta(hours=1)
 
     # Model mappings: OpenAI model -> equivalent OpenRouter model IDs
+    # Only include models that are currently released and available in OpenRouter
     OPENAI_TO_OPENROUTER = {
+        'gpt-5': 'openai/gpt-5',  # Added: Confirmed available in OpenRouter API
         'gpt-4': 'openai/gpt-4',
         'gpt-4-turbo': 'openai/gpt-4-turbo',
         'gpt-4-turbo-preview': 'openai/gpt-4-turbo-preview',
@@ -34,6 +36,7 @@ class PricingService:
 
     # Mistral equivalents for migration suggestions
     OPENAI_TO_MISTRAL = {
+        'gpt-5': 'mistralai/mistral-large',  # GPT-5 -> Mistral Large equivalent
         'gpt-4': 'mistralai/mistral-large',
         'gpt-4-turbo': 'mistralai/mistral-large',
         'gpt-4-turbo-preview': 'mistralai/mistral-large',
@@ -147,7 +150,14 @@ class PricingService:
         return self._get_fallback_pricing()
 
     def _get_fallback_pricing(self) -> Dict:
-        """Fallback pricing data if OpenRouter API is unavailable"""
+        """
+        Fallback pricing data if OpenRouter API is unavailable.
+
+        IMPORTANT: These are approximate prices as of January 2025.
+        Only includes currently released and publicly available models.
+        Do not add speculative pricing for unreleased models.
+        """
+        print("WARNING: Using fallback pricing estimates (OpenRouter API unavailable)")
         return {
             'openai/gpt-4': {'prompt': 0.00003, 'completion': 0.00006, 'name': 'GPT-4'},
             'openai/gpt-4-turbo': {'prompt': 0.00001, 'completion': 0.00003, 'name': 'GPT-4 Turbo'},
@@ -174,10 +184,41 @@ class PricingService:
             # Fetch new pricing data
             return self._fetch_pricing_data()
 
-    def get_model_pricing(self, model_id: str) -> Optional[Dict]:
-        """Get pricing for a specific model"""
+    def model_exists(self, model_id: str) -> bool:
+        """
+        Check if a model exists in OpenRouter's pricing data.
+
+        Args:
+            model_id: OpenRouter model ID (e.g., 'openai/gpt-4')
+
+        Returns:
+            True if model pricing is available, False otherwise
+        """
         pricing_data = self.get_pricing_data()
-        return pricing_data.get(model_id)
+        return model_id in pricing_data
+
+    def get_model_pricing(self, model_id: str) -> Optional[Dict]:
+        """
+        Get pricing for a specific model.
+
+        Args:
+            model_id: OpenRouter model ID (e.g., 'openai/gpt-4')
+
+        Returns:
+            Dict with pricing data if available, None otherwise
+
+        Note:
+            Logs a warning if model is not found in pricing data
+        """
+        pricing_data = self.get_pricing_data()
+        pricing = pricing_data.get(model_id)
+
+        if pricing is None:
+            print(f"WARNING: Model '{model_id}' not found in pricing data.")
+            print(f"  This may be a new/unreleased model or a typo.")
+            print(f"  Cost calculations will return 0.0 for this model.")
+
+        return pricing
 
     def calculate_cost(
         self,
