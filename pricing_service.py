@@ -6,6 +6,7 @@ Fetches and caches model pricing data from OpenRouter API
 import requests
 from typing import Dict, Optional, Tuple
 from datetime import datetime, timedelta
+from threading import Lock
 import os
 
 
@@ -47,6 +48,7 @@ class PricingService:
     def __init__(self):
         self._pricing_cache: Optional[Dict] = None
         self._cache_timestamp: Optional[datetime] = None
+        self._cache_lock = Lock()  # Thread-safe lock for cache operations
         self.api_key = os.environ.get('OPENROUTER_API_KEY', '')
 
     def _is_cache_valid(self) -> bool:
@@ -104,10 +106,19 @@ class PricingService:
         }
 
     def get_pricing_data(self) -> Dict:
-        """Get pricing data, using cache if valid or fetching if needed"""
-        if not self._is_cache_valid():
+        """Get pricing data, using cache if valid or fetching if needed (thread-safe)"""
+        # Fast path: check cache without lock
+        if self._is_cache_valid():
+            return self._pricing_cache
+
+        # Slow path: acquire lock and fetch if still needed
+        with self._cache_lock:
+            # Double-check after acquiring lock (another thread may have fetched)
+            if self._is_cache_valid():
+                return self._pricing_cache
+
+            # Fetch new pricing data
             return self._fetch_pricing_data()
-        return self._pricing_cache
 
     def get_model_pricing(self, model_id: str) -> Optional[Dict]:
         """Get pricing for a specific model"""
