@@ -57,40 +57,94 @@ class PricingService:
             return False
         return datetime.now() - self._cache_timestamp < self.CACHE_DURATION
 
-    def _fetch_pricing_data(self) -> Dict:
-        """Fetch pricing data from OpenRouter API"""
+    def _fetch_pricing_data(self, max_retries: int = 3) -> Dict:
+        """
+        Fetch pricing data from OpenRouter API with retry logic.
+
+        Args:
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            Dict of model pricing data
+
+        Note:
+            Falls back to hardcoded pricing if all retries fail
+        """
         headers = {}
         if self.api_key:
             headers['Authorization'] = f'Bearer {self.api_key}'
 
-        try:
-            response = requests.get(self.OPENROUTER_API_URL, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+        last_error = None
 
-            # Convert to dict keyed by model ID for easier lookup
-            pricing_dict = {}
-            for model in data.get('data', []):
-                model_id = model.get('id')
-                pricing = model.get('pricing', {})
-                if model_id and pricing:
-                    pricing_dict[model_id] = {
-                        'prompt': float(pricing.get('prompt', 0)),
-                        'completion': float(pricing.get('completion', 0)),
-                        'name': model.get('name', model_id),
-                        'context_length': model.get('context_length', 0),
-                    }
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(
+                    self.OPENROUTER_API_URL,
+                    headers=headers,
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
 
-            # Cache the results
-            self._pricing_cache = pricing_dict
-            self._cache_timestamp = datetime.now()
+                # Validate response structure
+                if 'data' not in data:
+                    raise ValueError("Invalid API response: missing 'data' field")
 
-            return pricing_dict
+                # Convert to dict keyed by model ID for easier lookup
+                pricing_dict = {}
+                for model in data.get('data', []):
+                    model_id = model.get('id')
+                    pricing = model.get('pricing', {})
+                    if model_id and pricing:
+                        pricing_dict[model_id] = {
+                            'prompt': float(pricing.get('prompt', 0)),
+                            'completion': float(pricing.get('completion', 0)),
+                            'name': model.get('name', model_id),
+                            'context_length': model.get('context_length', 0),
+                        }
 
-        except Exception as e:
-            print(f"Warning: Failed to fetch pricing from OpenRouter: {e}")
-            # Return fallback pricing if API fails
-            return self._get_fallback_pricing()
+                # Cache the results
+                self._pricing_cache = pricing_dict
+                self._cache_timestamp = datetime.now()
+
+                return pricing_dict
+
+            except requests.exceptions.Timeout as e:
+                last_error = f"Timeout (attempt {attempt + 1}/{max_retries})"
+                print(f"Warning: OpenRouter API timeout: {e}")
+
+            except requests.exceptions.HTTPError as e:
+                status_code = e.response.status_code if e.response else 'unknown'
+                last_error = f"HTTP {status_code} (attempt {attempt + 1}/{max_retries})"
+                print(f"Warning: OpenRouter API HTTP error {status_code}: {e}")
+
+                # Don't retry on 4xx errors (client errors)
+                if e.response and 400 <= e.response.status_code < 500:
+                    break
+
+            except requests.exceptions.RequestException as e:
+                last_error = f"Network error (attempt {attempt + 1}/{max_retries})"
+                print(f"Warning: OpenRouter API network error: {e}")
+
+            except (ValueError, KeyError) as e:
+                last_error = f"Invalid response (attempt {attempt + 1}/{max_retries})"
+                print(f"Warning: Invalid OpenRouter API response: {e}")
+                break  # Don't retry on data format errors
+
+            except Exception as e:
+                last_error = f"Unexpected error (attempt {attempt + 1}/{max_retries})"
+                print(f"Warning: Unexpected error fetching pricing: {e}")
+                break
+
+            # Wait before retry (exponential backoff)
+            if attempt < max_retries - 1:
+                import time
+                wait_time = 2 ** attempt  # 1s, 2s, 4s
+                time.sleep(wait_time)
+
+        print(f"Warning: All retries exhausted. Last error: {last_error}")
+        print("Falling back to hardcoded pricing estimates")
+        return self._get_fallback_pricing()
 
     def _get_fallback_pricing(self) -> Dict:
         """Fallback pricing data if OpenRouter API is unavailable"""
@@ -131,7 +185,26 @@ class PricingService:
         prompt_tokens: int,
         completion_tokens: int
     ) -> float:
-        """Calculate cost for a model given token counts"""
+        """
+        Calculate cost for a model given token counts.
+
+        Args:
+            model_id: OpenRouter model ID (e.g., 'openai/gpt-4')
+            prompt_tokens: Number of prompt tokens (must be non-negative)
+            completion_tokens: Number of completion tokens (must be non-negative)
+
+        Returns:
+            Total cost in dollars
+
+        Raises:
+            ValueError: If token counts are negative
+        """
+        # Validate input
+        if prompt_tokens < 0:
+            raise ValueError(f"prompt_tokens must be non-negative, got {prompt_tokens}")
+        if completion_tokens < 0:
+            raise ValueError(f"completion_tokens must be non-negative, got {completion_tokens}")
+
         pricing = self.get_model_pricing(model_id)
         if not pricing:
             return 0.0
@@ -155,11 +228,25 @@ class PricingService:
 
         Returns:
             Dict with cost breakdown and savings
+
+        Raises:
+            ValueError: If token counts are negative or usage percentages invalid
         """
         if openai_models is None:
             openai_models = {'gpt-4': 1.0}
 
         prompt_tokens, completion_tokens = estimated_monthly_tokens
+
+        # Validate token counts
+        if prompt_tokens < 0:
+            raise ValueError(f"prompt_tokens must be non-negative, got {prompt_tokens}")
+        if completion_tokens < 0:
+            raise ValueError(f"completion_tokens must be non-negative, got {completion_tokens}")
+
+        # Validate usage percentages
+        for model_name, usage_pct in openai_models.items():
+            if usage_pct < 0 or usage_pct > 1:
+                raise ValueError(f"Usage percentage for {model_name} must be between 0 and 1, got {usage_pct}")
 
         # Calculate OpenAI costs
         openai_total = 0.0

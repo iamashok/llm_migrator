@@ -157,27 +157,44 @@ class MigrationAnalyzer:
                 ))
 
     def _extract_model_name(self, current_line: str, all_lines: List[str], current_index: int) -> str:
-        """Extract model name from API call or surrounding context"""
-        # Try to find model in current line
+        """
+        Extract model name from API call or surrounding context.
+        Uses balanced parenthesis tracking to handle complex nested structures.
+        """
+        # Enhanced patterns to match various model specifications
         model_patterns = [
-            r'model\s*=\s*["\']([^"\']+)["\']',
-            r'model:\s*["\']([^"\']+)["\']',
+            r'model\s*=\s*["\']([^"\']+)["\']',  # model="gpt-4"
+            r'model:\s*["\']([^"\']+)["\']',     # model: "gpt-4"
+            r'model\s*=\s*(\w+)',                 # model=MODEL_VAR
+            r'"model"\s*:\s*["\']([^"\']+)["\']', # "model": "gpt-4"
         ]
 
+        # Try to find model in current line first
         for pattern in model_patterns:
             match = re.search(pattern, current_line)
             if match:
                 return match.group(1)
 
-        # Look in the next few lines (multi-line function calls)
-        for offset in range(1, min(10, len(all_lines) - current_index)):
+        # Track parenthesis depth to find function call boundaries
+        paren_depth = current_line.count('(') - current_line.count(')')
+
+        # Look ahead with balanced parenthesis tracking (up to 50 lines)
+        max_lookahead = min(50, len(all_lines) - current_index)
+
+        for offset in range(1, max_lookahead):
             next_line = all_lines[current_index + offset - 1]
+
+            # Try to find model in this line
             for pattern in model_patterns:
                 match = re.search(pattern, next_line)
                 if match:
                     return match.group(1)
-            # Stop if we hit a closing parenthesis
-            if ')' in next_line:
+
+            # Update parenthesis depth
+            paren_depth += next_line.count('(') - next_line.count(')')
+
+            # Stop when we've closed all parentheses (end of function call)
+            if paren_depth <= 0:
                 break
 
         # Default to gpt-4 if not found
